@@ -3,13 +3,7 @@ const axios = require('axios');
 const KINGUIN_AUTH_URL = 'https://id.kinguin.net/auth/token';
 const KINGUIN_API_URL = 'https://gateway.kinguin.net/sales-manager-api/api/v1';
 
-let tokenCache = { token: null, expiresAt: null };
-
 async function getToken() {
-  if (tokenCache.token && tokenCache.expiresAt > Date.now()) {
-    return tokenCache.token;
-  }
-
   const params = new URLSearchParams();
   params.append('grant_type', 'client_credentials');
   params.append('client_id', process.env.KINGUIN_CLIENT_ID);
@@ -19,12 +13,7 @@ async function getToken() {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
   });
 
-  tokenCache = {
-    token: res.data.access_token,
-    expiresAt: Date.now() + (res.data.expires_in - 60) * 1000
-  };
-
-  return tokenCache.token;
+  return res.data.access_token;
 }
 
 async function kinguinRequest(method, path, data = null) {
