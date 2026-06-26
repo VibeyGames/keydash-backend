@@ -52,8 +52,12 @@ async function addKeysToOffer(offerId, key) {
 }
 
 async function getOrders(page = 1, limit = 20) {
-  const data = await kinguinRequest('GET', `/orders?page=${page}&limit=${limit}`);
-  return data._embedded?.orderList || data.results || data || [];
+  try {
+    const data = await kinguinRequest('GET', `/reservations?page=${page}&limit=${limit}`);
+    return data._embedded?.reservationList || data.results || data || [];
+  } catch {
+    return [];
+  }
 }
 
 async function getOfferStats() {
