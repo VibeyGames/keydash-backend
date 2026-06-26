@@ -24,12 +24,17 @@ async function kinguinRequest(method, path, data = null) {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   };
   if (data) config.data = data;
-  const res = await axios(config);
-  return res.data;
+  try {
+    const res = await axios(config);
+    return res.data;
+  } catch (err) {
+    console.error('Kinguin API error:', err.response?.data || err.message);
+    throw err;
+  }
 }
 
 async function getOffers(page = 1, limit = 20) {
-  return kinguinRequest('GET', `/offers?page=${page}&limit=${limit}`);
+  return kinguinRequest('GET', `/offers?page=${page}&limit=${limit}&status=ACTIVE`);
 }
 
 async function createOffer(productId, price, keys = []) {
@@ -47,7 +52,10 @@ async function updateOfferPrice(offerId, price) {
 }
 
 async function addKeysToOffer(offerId, keys) {
-  return kinguinRequest('POST', `/offers/${offerId}/keys`, { keys });
+  return kinguinRequest('POST', `/offers/${offerId}/stock`, {
+    body: keys.join('\n'),
+    mimeType: 'text/plain'
+  });
 }
 
 async function getOrders(page = 1, limit = 20) {
@@ -55,12 +63,18 @@ async function getOrders(page = 1, limit = 20) {
 }
 
 async function getOfferStats() {
-  const offers = await getOffers(1, 100);
-  const totalKeys = offers.results?.reduce((sum, o) => sum + (o.qty || 0), 0) || 0;
-  const activeListings = offers.results?.filter(o => o.status === 'active').length || 0;
-  const lowStock = offers.results?.filter(o => (o.qty || 0) <= 5 && (o.qty || 0) > 0) || [];
-  const emptyStock = offers.results?.filter(o => (o.qty || 0) === 0) || [];
-  return { totalKeys, activeListings, lowStock, emptyStock, offers: offers.results || [] };
+  try {
+    const offers = await getOffers(1, 100);
+    const results = offers.results || offers || [];
+    const totalKeys = results.reduce((sum, o) => sum + (o.availableStock || o.qty || 0), 0);
+    const activeListings = results.filter(o => o.status === 'ACTIVE').length;
+    const lowStock = results.filter(o => (o.availableStock || 0) <= 5 && (o.availableStock || 0) > 0);
+    const emptyStock = results.filter(o => (o.availableStock || 0) === 0);
+    return { totalKeys, activeListings, lowStock, emptyStock, offers: results };
+  } catch (err) {
+    console.error('getOfferStats error:', err.message);
+    throw err;
+  }
 }
 
 module.exports = { getOffers, createOffer, updateOfferPrice, addKeysToOffer, getOrders, getOfferStats };
