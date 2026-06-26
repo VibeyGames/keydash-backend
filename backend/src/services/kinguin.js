@@ -60,6 +60,11 @@ async function getOrders(page = 1, limit = 20) {
   }
 }
 
+async function calculatePrice(productId, price) {
+  const priceInCents = Math.round(price * 100);
+  return kinguinRequest('GET', `/offers/calculations/priceAndCommission?kpcProductId=${productId}&price=${priceInCents}`);
+}
+
 async function getOfferStats() {
   const offers = await getOffers(1, 100);
   const totalKeys = offers.reduce((sum, o) => sum + (o.availableStock || 0), 0);
@@ -69,4 +74,4 @@ async function getOfferStats() {
   return { totalKeys, activeListings, lowStock, emptyStock, offers };
 }
 
-module.exports = { getOffers, createOffer, updateOfferPrice, addKeysToOffer, getOrders, getOfferStats };
+module.exports = { getOffers, createOffer, updateOfferPrice, addKeysToOffer, getOrders, getOfferStats, calculatePrice };
