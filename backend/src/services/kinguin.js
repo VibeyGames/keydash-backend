@@ -1,0 +1,77 @@
+const axios = require('axios');
+
+const KINGUIN_AUTH_URL = 'https://id.kinguin.net/auth/token';
+const KINGUIN_API_URL = 'https://gateway.kinguin.net/sales-manager-api/api/v1';
+
+let tokenCache = { token: null, expiresAt: null };
+
+async function getToken() {
+  if (tokenCache.token && tokenCache.expiresAt > Date.now()) {
+    return tokenCache.token;
+  }
+
+  const params = new URLSearchParams();
+  params.append('grant_type', 'client_credentials');
+  params.append('client_id', process.env.KINGUIN_CLIENT_ID);
+  params.append('client_secret', process.env.KINGUIN_SECRET_KEY);
+
+  const res = await axios.post(KINGUIN_AUTH_URL, params, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
+
+  tokenCache = {
+    token: res.data.access_token,
+    expiresAt: Date.now() + (res.data.expires_in - 60) * 1000
+  };
+
+  return tokenCache.token;
+}
+
+async function kinguinRequest(method, path, data = null) {
+  const token = await getToken();
+  const config = {
+    method,
+    url: `${KINGUIN_API_URL}${path}`,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  };
+  if (data) config.data = data;
+  const res = await axios(config);
+  return res.data;
+}
+
+async function getOffers(page = 1, limit = 20) {
+  return kinguinRequest('GET', `/offers?page=${page}&limit=${limit}`);
+}
+
+async function createOffer(productId, price, keys = []) {
+  return kinguinRequest('POST', '/offers', {
+    productId,
+    price: { amount: Math.round(price * 100), currency: 'EUR' },
+    keys
+  });
+}
+
+async function updateOfferPrice(offerId, price) {
+  return kinguinRequest('PATCH', `/offers/${offerId}`, {
+    price: { amount: Math.round(price * 100), currency: 'EUR' }
+  });
+}
+
+async function addKeysToOffer(offerId, keys) {
+  return kinguinRequest('POST', `/offers/${offerId}/keys`, { keys });
+}
+
+async function getOrders(page = 1, limit = 20) {
+  return kinguinRequest('GET', `/orders?page=${page}&limit=${limit}`);
+}
+
+async function getOfferStats() {
+  const offers = await getOffers(1, 100);
+  const totalKeys = offers.results?.reduce((sum, o) => sum + (o.qty || 0), 0) || 0;
+  const activeListings = offers.results?.filter(o => o.status === 'active').length || 0;
+  const lowStock = offers.results?.filter(o => (o.qty || 0) <= 5 && (o.qty || 0) > 0) || [];
+  const emptyStock = offers.results?.filter(o => (o.qty || 0) === 0) || [];
+  return { totalKeys, activeListings, lowStock, emptyStock, offers: offers.results || [] };
+}
+
+module.exports = { getOffers, createOffer, updateOfferPrice, addKeysToOffer, getOrders, getOfferStats };
