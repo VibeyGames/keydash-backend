@@ -45,6 +45,17 @@ router.patch('/offers/:id/price', async (req, res) => {
   }
 });
 
+router.get('/offers/:id/calculate', async (req, res) => {
+  try {
+    const { price, productId } = req.query;
+    if (!price || !productId) return res.status(400).json({ error: 'price and productId required' });
+    const data = await kinguin.calculatePrice(productId, parseFloat(price));
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to calculate', detail: err.message });
+  }
+});
+
 router.post('/offers/:id/keys', async (req, res) => {
   try {
     const { keys } = req.body;
